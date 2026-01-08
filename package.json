@@ -19,7 +19,7 @@
     "rest-api",
     "mysql"
   ],
-  "author": "",
+  "author": "fercho_dmc",
   "license": "MIT",
   "dependencies": {
     "@fastify/cors": "^10.0.1",
