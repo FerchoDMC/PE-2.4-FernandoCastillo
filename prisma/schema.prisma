@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USUARIOS Y ROLES ====================
+
+model Usuario {
+  id                  Int       @id @default(autoincrement())
+  nombres             String    @db.VarChar(100)
+  apellidos           String    @db.VarChar(100)
+  correoInstitucional String    @unique @db.VarChar(100)
+  clave               String    @db.VarChar(255)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relaciones
+  roles               UsuarioRol[]
+  estudiante          Estudiante?
+  tutor               Tutor?
+  director            Director?
+  coordinador         Coordinador?
+  observaciones       Observacion[]
+
+  @@map("usuarios")
+}
+
+model Rol {
+  id          Int          @id @default(autoincrement())
+  nombre      String       @unique @db.VarChar(50)
+  descripcion String?      @db.Text
+
+  // Relaciones
+  usuarios    UsuarioRol[]
+
+  @@map("roles")
+}
+
+model UsuarioRol {
+  usuarioId Int
+  rolId     Int
+
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol       Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, rolId])
+  @@map("usuarios_roles")
+}
+
+// ==================== ACTORES ESPECÍFICOS ====================
+
+model Estudiante {
+  id         Int      @id @default(autoincrement())
+  semestre   Int      @default(7)
+  usuarioId  Int      @unique
+
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  prerequisitos EstudiantePrerequisito[]
+  propuestas    Propuesta[]
+
+  @@map("estudiantes")
+}
+
+model Tutor {
+  id            Int      @id @default(autoincrement())
+  usuarioId     Int      @unique
+  especialidad  String?  @db.VarChar(100)
+
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  avances       Avance[]
+
+  @@map("tutores")
+}
+
+model Director {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int      @unique
+
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  avances   Avance[]
+
+  @@map("directores")
+}
+
+model Coordinador {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int      @unique
+
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  avances   Avance[]
+
+  @@map("coordinadores")
+}
+
+// ==================== PRERREQUISITOS ====================
+
+model Prerequisito {
+  id          Int      @id @default(autoincrement())
+  nombre      String   @db.VarChar(100)
+  descripcion String?  @db.Text
+
+  // Relaciones
+  estudiantes EstudiantePrerequisito[]
+
+  @@map("prerequisitos")
+}
+
+model EstudiantePrerequisito {
+  estudianteId      Int
+  prerequisitoId    Int
+  estadoValidacion  String   @default("pendiente") @db.VarChar(20) // 'pendiente', 'completado', 'validado'
+  fechaMarcado      DateTime?
+  fechaValidacion   DateTime?
+
+  estudiante   Estudiante   @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  prerequisito Prerequisito @relation(fields: [prerequisitoId], references: [id], onDelete: Cascade)
+
+  @@id([estudianteId, prerequisitoId])
+  @@map("estudiantes_prerequisitos")
+}
+
+// ==================== PROPUESTAS Y ANTEPROYECTOS ====================
+
+model Propuesta {
+  id                 Int       @id @default(autoincrement())
+  estudianteId       Int
+  tipo               String    @default("idea") @db.VarChar(20) // 'idea', 'anteproyecto'
+  numeroIdea         Int?      // 1, 2, 3 para las ideas iniciales
+  tema               String    @db.VarChar(255)
+  objetivos          String    @db.Text
+  problematica       String    @db.Text
+  areaInvestigacion  String?   @db.VarChar(100)
+  alcance            String    @db.Text
+  archivo            String?   @db.VarChar(255)
+  estado             String    @default("pendiente") @db.VarChar(20) // 'pendiente', 'aprobada', 'rechazada'
+  fechaCreacion      DateTime  @default(now())
+  fechaLimite        DateTime?
+
+  estudiante    Estudiante     @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  observaciones Observacion[]
+  avances       Avance[]
+  predefensa    Predefensa?
+  defensa       Defensa?
+
+  @@map("propuestas")
+}
+
+// ==================== OBSERVACIONES (FEEDBACK MÚLTIPLE) ====================
+
+model Observacion {
+  id           Int      @id @default(autoincrement())
+  propuestaId  Int
+  usuarioId    Int
+  comentario   String   @db.Text
+  fechaCreacion DateTime @default(now())
+
+  propuesta Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuario   Propuesta @relation(fields: [propuestaId], references: [id], onDelete: Cascade)
+
+  @@map("observaciones")
+}
+
+// ==================== AVANCES SEMANALES ====================
+
+model Avance {
+  id                 Int       @id @default(autoincrement())
+  propuestaId        Int
+  tutorId            Int?
+  directorId         Int?
+  coordinadorId      Int?
+  semana             Int
+  contenido          String    @db.Text
+  porcentajeAvance   Decimal?  @db.Decimal(5, 2)
+  fechaInicio        DateTime
+  fechaEntrega       DateTime
+  fechaEntregaReal   DateTime?
+  estado             String    @default("pendiente") @db.VarChar(20) // 'pendiente', 'entregado', 'revisado'
+  calificacion       Decimal?  @db.Decimal(5, 2)
+  verificacionRevision Boolean @default(false)
+
+  propuesta    Propuesta     @relation(fields: [propuestaId], references: [id], onDelete: Cascade)
+  tutor        Tutor?        @relation(fields: [tutorId], references: [id])
+  director     Director?     @relation(fields: [directorId], references: [id])
+  coordinador  Coordinador?  @relation(fields: [coordinadorId], references: [id])
+
+  @@map("avances")
+}
+
+// ==================== PREDEFENSA Y DEFENSA ====================
+
+model Predefensa {
+  id                   Int      @id @default(autoincrement())
+  propuestaId          Int      @unique
+  fecha                DateTime
+  manualUsuario        String?  @db.VarChar(255)
+  manualProgramador    String?  @db.VarChar(255)
+  articuloCientifico   String?  @db.VarChar(255)
+  calificacion         Decimal? @db.Decimal(5, 2)
+
+  propuesta Propuesta @relation(fields: [propuestaId], references: [id], onDelete: Cascade)
+
+  @@map("predefensas")
+}
+
+model Defensa {
+  id           Int      @id @default(autoincrement())
+  propuestaId  Int      @unique
+  fecha        DateTime
+  calificacion Decimal? @db.Decimal(5, 2)
+  observaciones String? @db.Text
+
+  propuesta Propuesta @relation(fields: [propuestaId], references: [id], onDelete: Cascade)
+
+  @@map("defensas")
+}
